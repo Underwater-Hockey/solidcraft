@@ -51,9 +51,9 @@ impl PlasticRule {
             PlasticRule::new("ABS (1.5mm)", "ABS Plastic", false, "1.5 mm", "3.5 mm", "1.2 mm"),
             PlasticRule::new("Nylon (PA6) (2.5mm)", "Nylon 6", false, "2.5 mm", "3 mm", "0.8 mm"),
             PlasticRule::new("Polypropylene (PP) (3 mm)", "Polypropylene", false, "3 mm", "3.8 mm", "0.8 mm"),
-            PlasticRule::new("ABS (0.1 in)", "ABS Plastic", true, "0.1 in", "3.5 mm", "1.2 mm"),
-            PlasticRule::new("Nylon (PA6) (0.1 in)", "Nylon 6", true, "0.1 in", "3 mm", "0.8 mm"),
-            PlasticRule::new("Polypropylene (PP) (0.1 in)", "Polypropylene", true, "0.1 in", "3.8 mm", "0.8 mm"),
+            PlasticRule::new("ABS (0.1 in)", "ABS Plastic", true, "0.1 in", "0.14 in", "0.05 in"),
+            PlasticRule::new("Nylon (PA6) (0.1 in)", "Nylon 6", true, "0.1 in", "0.12 in", "0.03 in"),
+            PlasticRule::new("Polypropylene (PP) (0.1 in)", "Polypropylene", true, "0.1 in", "0.15 in", "0.03 in"),
         ]
     }
 
@@ -204,5 +204,23 @@ mod tests {
         let pp_in = d.plastic_values(&vals, &d.plastic_rule("Polypropylene (PP) (0.1 in)").unwrap()).unwrap();
         assert!((pp_in.thickness - 2.54).abs() < 1e-9 && (pp_in.nominal_radius - 1.27).abs() < 1e-9 && (pp_in.clearance - 0.1016).abs() < 1e-9);
         assert_eq!(d.plastic_rules().len(), 6);
+    }
+
+    /// Each library rule writes every length in the unit its name gives (#22133): an inch rule
+    /// listed its thickness limits in millimetres.
+    #[test]
+    fn library_rules_keep_one_unit() {
+        for rule in PlasticRule::library() {
+            let (unit, other) = if rule.name.ends_with(" in)") { (" in", " mm") } else { (" mm", " in") };
+            for (field, value, kind) in rule.fields() {
+                if kind == Kind::Length && !value.contains("Thickness") {
+                    assert!(value.ends_with(unit) && !value.contains(other), "`{}`: {field} is `{value}`, not in{unit}", rule.name);
+                }
+            }
+        }
+        let d = Document::default();
+        let vals = BTreeMap::new();
+        let abs_in = d.plastic_values(&vals, &d.plastic_rule("ABS (0.1 in)").unwrap()).unwrap();
+        assert!(abs_in.min_thickness < abs_in.thickness && abs_in.thickness < abs_in.max_thickness);
     }
 }
